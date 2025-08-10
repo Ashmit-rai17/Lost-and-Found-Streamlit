@@ -25,7 +25,38 @@ os.makedirs("data", exist_ok=True)
 # SAMPLE DATA CREATION
 # ----------------------------
 
-def create_placeholder_image(text, path):
+from PIL import Image, ImageDraw, ImageFont
+
+def create_placeholder_image(text, path, size=(400, 300), bg=(240,240,240), text_color=(0,0,0)):
+    img = Image.new("RGB", size, bg)
+    d = ImageDraw.Draw(img)
+
+    # try to load a TrueType font, else fallback to default bitmap font
+    try:
+        font = ImageFont.truetype("arial.ttf", 20)
+    except Exception:
+        font = ImageFont.load_default()
+
+    # compute text width/height in a compatible way
+    try:
+        # Pillow >= 8/9+: textbbox exists and is recommended
+        bbox = d.textbbox((0, 0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+    except AttributeError:
+        try:
+            # older Pillow: textsize may exist
+            text_w, text_h = d.textsize(text, font=font)
+        except AttributeError:
+            # last-resort fallback
+            text_w, text_h = font.getsize(text)
+
+    x = (size[0] - text_w) // 2
+    y = (size[1] - text_h) // 2
+
+    d.text((x, y), text, fill=text_color, font=font)
+    img.save(path)
+
     img = Image.new('RGB', (400, 300), color=(100, 150, 200))
     d = ImageDraw.Draw(img)
     try:
