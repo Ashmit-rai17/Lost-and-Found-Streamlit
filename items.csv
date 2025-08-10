@@ -1,0 +1,3 @@
+id,type,title,description,category,image_path,latitude,longitude,reported_at,qr_code_path
+df2e2042-7a70-43ca-96e2-cc10e3672eb6,lost,as,d,Accessories,,0.0,0.0,2025-08-10 15:08:43,images/qr_codes\df2e2042-7a70-43ca-96e2-cc10e3672eb6.png
+b7a11df6-dee8-42aa-9f14-fb40d0df8abb,lost,jacket,black,Accessories,,0.0,0.04,2025-08-10 15:16:36,images/qr_codes\b7a11df6-dee8-42aa-9f14-fb40d0df8abb.png
