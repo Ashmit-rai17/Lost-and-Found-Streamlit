@@ -3,12 +3,11 @@ import pandas as pd
 import os
 import uuid
 from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 import qrcode
 import pydeck as pdk
 import cv2
 import tempfile
-import numpy as np
 
 # ----------------------------
 # CONFIG
@@ -22,130 +21,9 @@ os.makedirs(QR_DIR, exist_ok=True)
 os.makedirs("data", exist_ok=True)
 
 # ----------------------------
-# SAMPLE DATA CREATION
-# ----------------------------
-
-from PIL import Image, ImageDraw, ImageFont
-
-def create_placeholder_image(text, path, size=(400, 300), bg=(240,240,240), text_color=(0,0,0)):
-    img = Image.new("RGB", size, bg)
-    d = ImageDraw.Draw(img)
-
-    # try to load a TrueType font, else fallback to default bitmap font
-    try:
-        font = ImageFont.truetype("arial.ttf", 20)
-    except Exception:
-        font = ImageFont.load_default()
-
-    # compute text width/height in a compatible way
-    try:
-        # Pillow >= 8/9+: textbbox exists and is recommended
-        bbox = d.textbbox((0, 0), text, font=font)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
-    except AttributeError:
-        try:
-            # older Pillow: textsize may exist
-            text_w, text_h = d.textsize(text, font=font)
-        except AttributeError:
-            # last-resort fallback
-            text_w, text_h = font.getsize(text)
-
-    x = (size[0] - text_w) // 2
-    y = (size[1] - text_h) // 2
-
-    d.text((x, y), text, fill=text_color, font=font)
-    img.save(path)
-
-    img = Image.new('RGB', (400, 300), color=(100, 150, 200))
-    d = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 24)
-    except:
-        font = ImageFont.load_default()
-    text_w, text_h = d.textsize(text, font=font)
-    d.text(((400 - text_w) / 2, (300 - text_h) / 2), text, fill=(255, 255, 255), font=font)
-    img.save(path)
-
-def generate_qr_code_image(item_id, path):
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(f"Item ID: {item_id}")
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    img.save(path)
-
-def create_sample_data():
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE)
-        if not df.empty:
-            return  # Data exists, no need to recreate
-
-    # Sample items
-    items = [
-        {
-            "id": "11111111-aaaa-bbbb-cccc-111111111111",
-            "type": "lost",
-            "title": "Blue Backpack",
-            "description": "Lost a blue backpack near the library",
-            "category": "Bags",
-            "latitude": 12.9716,
-            "longitude": 77.5946,
-            "reported_at": "2025-08-10 10:00:00",
-        },
-        {
-            "id": "22222222-bbbb-cccc-dddd-222222222222",
-            "type": "found",
-            "title": "Silver Wristwatch",
-            "description": "Found a silver wristwatch in the cafeteria",
-            "category": "Accessories",
-            "latitude": 12.9720,
-            "longitude": 77.5950,
-            "reported_at": "2025-08-09 14:30:00",
-        },
-        {
-            "id": "33333333-cccc-dddd-eeee-333333333333",
-            "type": "lost",
-            "title": "Black Jacket",
-            "description": "Black jacket lost in auditorium",
-            "category": "Clothing",
-            "latitude": 12.9705,
-            "longitude": 77.5930,
-            "reported_at": "2025-08-08 18:20:00",
-        },
-    ]
-
-    rows = []
-    for item in items:
-        image_path = os.path.join(IMAGES_DIR, f"{item['id']}.png")
-        qr_code_path = os.path.join(QR_DIR, f"{item['id']}.png")
-
-        create_placeholder_image(item['title'], image_path)
-        generate_qr_code_image(item['id'], qr_code_path)
-
-        row = {
-            "id": item["id"],
-            "type": item["type"],
-            "title": item["title"],
-            "description": item["description"],
-            "category": item["category"],
-            "image_path": image_path,
-            "latitude": item["latitude"],
-            "longitude": item["longitude"],
-            "reported_at": item["reported_at"],
-            "qr_code_path": qr_code_path,
-        }
-        rows.append(row)
-
-    df = pd.DataFrame(rows)
-    df.to_csv(DATA_FILE, index=False)
-
-
-# ----------------------------
 # LOAD & SAVE FUNCTIONS
 # ----------------------------
 def load_data():
-    create_sample_data()  # Ensure sample data exists on load
-
     if os.path.exists(DATA_FILE):
         return pd.read_csv(DATA_FILE)
     else:
@@ -170,7 +48,6 @@ def generate_qr_code(item_id):
 # ----------------------------
 # PAGES
 # ----------------------------
-
 def home_page():
     st.title("🏠 Lost & Found")
     st.write("""
@@ -280,8 +157,6 @@ def map_view_page():
                                zoom=12)
     st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state))
 
-# QR Code Scanner page using OpenCV and pyzbar
-
 def qr_code_scanner_page():
     st.title("📷 QR Code Scanner")
     st.write("Upload a photo of a QR code to decode the item ID.")
@@ -289,18 +164,15 @@ def qr_code_scanner_page():
     uploaded_file = st.file_uploader("Upload QR code image", type=["png", "jpg", "jpeg"])
 
     if uploaded_file is not None:
-        # Save to temp file to work with OpenCV
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_file.read())
         tfile.close()
 
-        # Read image with OpenCV
         img = cv2.imread(tfile.name)
         if img is None:
             st.error("Error loading image. Please try another file.")
             return
 
-        # Decode QR code using pyzbar
         try:
             from pyzbar import pyzbar
         except ImportError:
@@ -314,7 +186,6 @@ def qr_code_scanner_page():
             for obj in decoded_objects:
                 data = obj.data.decode("utf-8")
                 st.success(f"Decoded data: {data}")
-                # If format is "Item ID: <id>", extract id and show item details
                 if data.startswith("Item ID: "):
                     item_id = data.replace("Item ID: ", "").strip()
                     df = load_data()
@@ -336,7 +207,6 @@ def qr_code_scanner_page():
 # ----------------------------
 # MAIN APP
 # ----------------------------
-
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Report Item", "Browse Items", "Map View", "QR Code Scanner"])
 
